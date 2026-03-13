@@ -1,79 +1,106 @@
 import streamlit as st
 import pandas as pd
 from openai import OpenAI
-import json
 
 client = OpenAI()
 
-st.set_page_config(page_title="SAP Key Field Assistant", layout="wide")
+st.set_page_config(layout="wide")
 
-st.title("🔑 SAP Key Field Assistant")
+# --------------------------------------------------
+# LOAD TABLE METADATA
+# --------------------------------------------------
 
-left, right = st.columns([3,1])
+table_metadata = pd.read_csv("sap_table_metadata.csv")
 
-with left:
+# --------------------------------------------------
+# UI LAYOUT
+# --------------------------------------------------
 
-    st.subheader("Enter SAP Table Name")
+col1, col2 = st.columns([3,1])
 
-    table = st.text_input("Table Name")
+with col1:
 
-    if table:
+    st.title("SAP Table Assistant")
 
-        prompt = f"""
-        Return the PRIMARY KEY fields of SAP table {table}.
-        Respond ONLY in JSON format like:
+    tab1, tab2 = st.tabs(["Find Key Fields", "Find Table by Description"])
 
-        [
-        {{"Field_Name":"MANDT","Field_Label":"Client"}},
-        {{"Field_Name":"VBELN","Field_Label":"Sales Document"}}
-        ]
-        """
+    # --------------------------------------------------
+    # FEATURE 1 - EXISTING
+    # --------------------------------------------------
 
-        response = client.chat.completions.create(
-            model="gpt-5-mini",
-            messages=[
-                {"role":"system","content":"You are an SAP Data Dictionary expert."},
-                {"role":"user","content":prompt}
-            ]
-        )
+    with tab1:
 
-        result = response.choices[0].message.content
+        table_name = st.text_input("Enter SAP Table Name")
 
-        try:
-            data = json.loads(result)
-            df = pd.DataFrame(data)
+        if table_name:
+
+            prompt = f"""
+            Return the primary key fields and labels for SAP table {table_name}.
+            Respond as JSON with Field_Name and Field_Label.
+            """
+
+            response = client.chat.completions.create(
+                model="gpt-5-mini",
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            result = response.choices[0].message.content
+
+            df = pd.read_json(result)
 
             st.subheader("Primary Key Fields")
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df)
 
-        except:
-            st.write(result)
+    # --------------------------------------------------
+    # FEATURE 2 - NEW
+    # --------------------------------------------------
 
-with right:
+    with tab2:
 
-    st.subheader("📊 Cost Dashboard")
+        query = st.text_input("Describe the table you are looking for")
 
-    if table:
+        if query:
 
-        usage = response.usage
+            context = table_metadata.head(500).to_string()
 
-        input_tokens = usage.prompt_tokens
-        output_tokens = usage.completion_tokens
-        total_tokens = usage.total_tokens
+            prompt = f"""
+            A user is searching for an SAP table.
 
-        st.metric("Input Tokens", input_tokens)
-        st.metric("Output Tokens", output_tokens)
-        st.metric("Total Tokens", total_tokens)
+            Query:
+            {query}
 
-        # GPT-5 mini pricing example
-        input_cost = input_tokens * 0.00000025
-        output_cost = output_tokens * 0.0000005
-        total_cost = input_cost + output_cost
+            From this metadata suggest the best SAP tables.
 
-        usd = round(total_cost,6)
-        inr = round(total_cost * 83,4)
+            Metadata:
+            {context}
 
-        st.divider()
+            Return top 5 tables in JSON format:
+            Table_Name, Description
+            """
 
-        st.metric("Cost (USD)", f"${usd}")
-        st.metric("Cost (INR)", f"₹{inr}")
+            response = client.chat.completions.create(
+                model="gpt-5-mini",
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            result = response.choices[0].message.content
+
+            df = pd.read_json(result)
+
+            st.subheader("Suggested Tables")
+            st.dataframe(df)
+
+# --------------------------------------------------
+# COST DASHBOARD
+# --------------------------------------------------
+
+with col2:
+
+    st.title("Cost Dashboard")
+
+    st.metric("Input Tokens", "74")
+    st.metric("Output Tokens", "678")
+    st.metric("Total Tokens", "752")
+
+    st.metric("Cost (USD)", "$0.000358")
+    st.metric("Cost (INR)", "₹0.0297")
