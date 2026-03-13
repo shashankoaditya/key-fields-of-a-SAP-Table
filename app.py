@@ -10,7 +10,17 @@ st.set_page_config(layout="wide")
 # LOAD TABLE METADATA
 # --------------------------------------------------
 
-table_metadata = pd.read_csv("sap_table_metadata.csv")
+prompt = f"""
+A SAP consultant is searching for a table.
+
+User query:
+{query}
+
+Suggest the most likely SAP tables.
+Return JSON with:
+Table_Name
+Description
+"""
 
 # --------------------------------------------------
 # UI LAYOUT
