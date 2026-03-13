@@ -2,41 +2,28 @@ import streamlit as st
 import pandas as pd
 from openai import OpenAI
 
+# Initialize OpenAI
 client = OpenAI()
 
 st.set_page_config(layout="wide")
 
-# --------------------------------------------------
-# LOAD TABLE METADATA
-# --------------------------------------------------
+# Layout
+left_col, right_col = st.columns([3,1])
 
-prompt = f"""
-A SAP consultant is searching for a table.
+# ---------------------------
+# MAIN APPLICATION
+# ---------------------------
 
-User query:
-{query}
-
-Suggest the most likely SAP tables.
-Return JSON with:
-Table_Name
-Description
-"""
-
-# --------------------------------------------------
-# UI LAYOUT
-# --------------------------------------------------
-
-col1, col2 = st.columns([3,1])
-
-with col1:
+with left_col:
 
     st.title("SAP Table Assistant")
 
     tab1, tab2 = st.tabs(["Find Key Fields", "Find Table by Description"])
 
-    # --------------------------------------------------
-    # FEATURE 1 - EXISTING
-    # --------------------------------------------------
+    # ----------------------------------
+    # FEATURE 1
+    # ENTER TABLE → GET KEY FIELDS
+    # ----------------------------------
 
     with tab1:
 
@@ -45,72 +32,88 @@ with col1:
         if table_name:
 
             prompt = f"""
-            Return the primary key fields and labels for SAP table {table_name}.
-            Respond as JSON with Field_Name and Field_Label.
-            """
+You are an SAP expert.
+
+Return the PRIMARY KEY fields of SAP table {table_name}.
+
+Return ONLY JSON in this format:
+
+[
+{{"Field_Name":"MANDT","Field_Label":"Client"}},
+{{"Field_Name":"VEHICLE","Field_Label":"Vehicle"}}
+]
+"""
 
             response = client.chat.completions.create(
-                model="gpt-5-mini",
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}]
             )
 
             result = response.choices[0].message.content
 
-            df = pd.read_json(result)
+            try:
+                df = pd.read_json(result)
+                st.subheader("Primary Key Fields")
+                st.dataframe(df)
+            except:
+                st.write(result)
 
-            st.subheader("Primary Key Fields")
-            st.dataframe(df)
-
-    # --------------------------------------------------
-    # FEATURE 2 - NEW
-    # --------------------------------------------------
+    # ----------------------------------
+    # FEATURE 2
+    # NATURAL LANGUAGE → TABLE NAME
+    # ----------------------------------
 
     with tab2:
 
-        query = st.text_input("Describe the table you are looking for")
+        query = st.text_input("Describe the SAP table you are searching for")
 
         if query:
 
-            context = table_metadata.head(500).to_string()
-
             prompt = f"""
-            A user is searching for an SAP table.
+You are an SAP consultant expert.
 
-            Query:
-            {query}
+A user is searching for an SAP table.
 
-            From this metadata suggest the best SAP tables.
+User request:
+{query}
 
-            Metadata:
-            {context}
+Suggest the most likely SAP tables.
 
-            Return top 5 tables in JSON format:
-            Table_Name, Description
-            """
+Return ONLY JSON in this format:
+
+[
+{{"Table_Name":"VLCVEHICLE","Description":"Vehicle Master"}},
+{{"Table_Name":"VLCSTATUS","Description":"Vehicle Status"}},
+{{"Table_Name":"VLCASSIGN","Description":"Vehicle Assignment"}}
+]
+"""
 
             response = client.chat.completions.create(
-                model="gpt-5-mini",
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}]
             )
 
             result = response.choices[0].message.content
 
-            df = pd.read_json(result)
+            try:
+                df = pd.read_json(result)
+                st.subheader("Suggested Tables")
+                st.dataframe(df)
+            except:
+                st.write(result)
 
-            st.subheader("Suggested Tables")
-            st.dataframe(df)
 
-# --------------------------------------------------
+# ---------------------------
 # COST DASHBOARD
-# --------------------------------------------------
+# ---------------------------
 
-with col2:
+with right_col:
 
-    st.title("Cost Dashboard")
+    st.title("📊 Cost Dashboard")
 
-    st.metric("Input Tokens", "74")
-    st.metric("Output Tokens", "678")
-    st.metric("Total Tokens", "752")
+    st.metric("Input Tokens", "Auto")
+    st.metric("Output Tokens", "Auto")
+    st.metric("Total Tokens", "Auto")
 
-    st.metric("Cost (USD)", "$0.000358")
-    st.metric("Cost (INR)", "₹0.0297")
+    st.metric("Cost (USD)", "Low")
+    st.metric("Cost (INR)", "Low")
