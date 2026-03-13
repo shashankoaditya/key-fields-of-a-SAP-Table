@@ -1,40 +1,59 @@
 import streamlit as st
 import pandas as pd
 from openai import OpenAI
+import json
 
 client = OpenAI()
 
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="SAP Key Field Assistant", layout="wide")
 
-st.title("SAP Table Key Fields Finder")
+st.title("🔑 SAP Key Field Assistant")
 
-col1, col2 = st.columns([3,1])
+left, right = st.columns([3,1])
 
-with col1:
-    table_name = st.text_input("Enter SAP Table Name")
+with left:
 
-    if table_name:
+    st.subheader("Enter SAP Table Name")
+
+    table = st.text_input("Table Name")
+
+    if table:
 
         prompt = f"""
-        Return the PRIMARY KEY fields of SAP table {table_name}.
-        Provide output in JSON format with two columns:
-        Field_Name
-        Field_Label
+        Return the PRIMARY KEY fields of SAP table {table}.
+        Respond ONLY in JSON format like:
+
+        [
+        {{"Field_Name":"MANDT","Field_Label":"Client"}},
+        {{"Field_Name":"VBELN","Field_Label":"Sales Document"}}
+        ]
         """
 
         response = client.chat.completions.create(
             model="gpt-5-mini",
             messages=[
-                {"role":"system","content":"You are an SAP data dictionary expert"},
+                {"role":"system","content":"You are an SAP Data Dictionary expert."},
                 {"role":"user","content":prompt}
             ]
         )
 
-        output = response.choices[0].message.content
-        st.write(output)
+        result = response.choices[0].message.content
 
-with col2:
-    if table_name:
+        try:
+            data = json.loads(result)
+            df = pd.DataFrame(data)
+
+            st.subheader("Primary Key Fields")
+            st.dataframe(df, use_container_width=True)
+
+        except:
+            st.write(result)
+
+with right:
+
+    st.subheader("📊 Cost Dashboard")
+
+    if table:
 
         usage = response.usage
 
@@ -42,7 +61,11 @@ with col2:
         output_tokens = usage.completion_tokens
         total_tokens = usage.total_tokens
 
-        # pricing example
+        st.metric("Input Tokens", input_tokens)
+        st.metric("Output Tokens", output_tokens)
+        st.metric("Total Tokens", total_tokens)
+
+        # GPT-5 mini pricing example
         input_cost = input_tokens * 0.00000025
         output_cost = output_tokens * 0.0000005
         total_cost = input_cost + output_cost
@@ -50,11 +73,7 @@ with col2:
         usd = round(total_cost,6)
         inr = round(total_cost * 83,4)
 
-        st.subheader("Token Usage")
-        st.write("Input Tokens:", input_tokens)
-        st.write("Output Tokens:", output_tokens)
-        st.write("Total Tokens:", total_tokens)
+        st.divider()
 
-        st.subheader("Cost")
-        st.write("USD:", usd)
-        st.write("INR:", inr)
+        st.metric("Cost (USD)", f"${usd}")
+        st.metric("Cost (INR)", f"₹{inr}")
